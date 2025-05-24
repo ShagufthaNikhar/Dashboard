@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rape Case Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: #e0f7fa;
+            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+            min-height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            color: #01579b;
+            margin-bottom: 40px;
+        }
+        #uploadDiv {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        #fileInput {
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            color: #01579b;
+            font-weight: bold;
+        }
+        #dashboard {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+        .chart {
+            width: 80%;
+            height: 400px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Rape Case Dashboard</h1>
+    <div id="uploadDiv">
+        <input type="file" id="fileInput" accept="application/json">
+    </div>
+    <div id="dashboard">
+        <div id="map" class="chart"></div>
+        <div id="ageDist" class="chart"></div>
+        <div id="incestVsOther" class="chart"></div>
+        <div id="victimsAgeGroupBar" class="chart"></div>
+        <div id="topStates" class="chart"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const jsonData = JSON.parse(e.target.result);
+                    generateDashboard(jsonData);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function generateDashboard(data) {
+            const filtered = data.filter(d => d.Category === "State" || d.Category === "Union Territory");
+            const states = filtered.map(d => d["States/UTs/Cities"]);
+            const totalCases = filtered.map(d => d["No. of Cases Reported (Total Rape Cases)"]);
+
+            Plotly.newPlot('map', [{
+                x: states,
+                y: totalCases,
+                type: 'bar'
+            }], {
+                title: 'Total Rape Cases by State/UT',
+                xaxis: { title: 'State/UT', tickangle: -45 },
+                yaxis: { title: 'Cases' }
+            });
+
+            const ageGroups = [
+                "No. of Victims (Total Rape Cases) upto 10 Years",
+                "No. of Victims (Total Rape Cases) - 10-14 Years",
+                "No. of Victims (Total Rape Cases) - 14 - 18 Years",
+                "No. of Victims (Total Rape Cases) - 18 - 30 Years",
+                "No. of Victims (Total Rape Cases) - 30 - 50 Years",
+                "No. of Victims (Total Rape Cases) above 50 Years"
+            ];
+            const traces = ageGroups.map(age => ({
+                x: states,
+                y: filtered.map(d => d[age]),
+                name: age,
+                type: 'bar'
+            }));
+            Plotly.newPlot('ageDist', traces, {
+                barmode: 'stack',
+                title: 'Victim Age Group Distribution by State/UT',
+                xaxis: { title: 'State/UT', tickangle: -45 },
+                yaxis: { title: 'Victim Count' }
+            });
+
+            Plotly.newPlot('incestVsOther', [
+                {
+                    x: states,
+                    y: filtered.map(d => d["No. of Cases Reported (Incest Rape Cases)"] || 0),
+                    name: 'Incest Rape Cases',
+                    type: 'bar'
+                },
+                {
+                    x: states,
+                    y: filtered.map(d => d["No. of Cases Reported (Other Rape Cases)"] || 0),
+                    name: 'Other Rape Cases',
+                    type: 'bar'
+                }
+            ], {
+                barmode: 'group',
+                title: 'Incest vs Other Rape Cases by State/UT',
+                xaxis: { title: 'State/UT', tickangle: -45 },
+                yaxis: { title: 'Cases' }
+            });
+
+            // New grouped bar chart for age distribution (formerly heatmap)
+            const ageTraces = ageGroups.map((group, idx) => ({
+                x: states,
+                y: filtered.map(d => d[group]),
+                name: group,
+                type: 'bar'
+            }));
+            Plotly.newPlot('victimsAgeGroupBar', ageTraces, {
+                barmode: 'group',
+                title: 'Grouped Bar Chart: Victims by Age Group and State/UT',
+                xaxis: { title: 'State/UT', tickangle: -45 },
+                yaxis: { title: 'Victim Count' }
+            });
+
+            const topData = filtered
+                .map(d => ({ name: d["States/UTs/Cities"], value: d["No. of Cases Reported (Total Rape Cases)"] }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 10);
+            Plotly.newPlot('topStates', [{
+                x: topData.map(d => d.name),
+                y: topData.map(d => d.value),
+                type: 'bar'
+            }], {
+                title: 'Top 10 States/UTs by Rape Cases',
+                xaxis: { title: 'State/UT' },
+                yaxis: { title: 'Total Cases' }
+            });
+        }
+    </script>
+</body>
+</html>
